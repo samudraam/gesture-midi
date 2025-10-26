@@ -247,7 +247,7 @@ function getBeatAtPinch(landmarks, centerX, centerY, radius) {
 }
 
 /**
- * Draws a single large circle interface
+ * Draws a single large circle interface with pulsing animations
  */
 function drawCircleInterface() {
   const centerX = canvas.width / 2;
@@ -260,6 +260,9 @@ function drawCircleInterface() {
   ctx.beginPath();
   ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
   ctx.stroke();
+
+  // Get current time for animation
+  const time = Date.now() / 1000;
 
   // Draw beat pulses around the circle
   const numBeats = 16;
@@ -291,29 +294,39 @@ function drawCircleInterface() {
     const isCurrent = i === currentStep && isPlaying;
     const isSelected = i === selectedBeat;
 
+    // Pulsing animation for all active beats
+    let pulseAnimation = 1;
+    if (isActive && isPlaying) {
+      // Animate with a subtle pulsing effect using sine wave
+      // Different phase for each beat (i * PI/8) creates a wave around the circle
+      pulseAnimation = 1 + 0.3 * Math.sin(time * 2 + (i * Math.PI) / 8);
+    }
+
     let circleRadius = 6; // Inactive beat - small
     let alpha = 0.6;
 
     if (isActive) {
       alpha = 0.95;
-      circleRadius = 12; // Active beat - bigger
+      circleRadius = 12 * pulseAnimation; // Active beat - bigger with pulse
     }
 
     if (isCurrent && isActive) {
-      // Currently playing - pulse effect
-      circleRadius = 16;
+      // Currently playing - extra pulse effect
+      circleRadius = 18 * pulseAnimation;
       alpha = 1;
     }
 
     // Draw beat circle with glow
     if (isCurrent && isActive) {
-      // Currently playing beat - pink pulse
-      ctx.shadowBlur = 25;
+      // Currently playing beat - pink pulse with stronger animation
+      const currentPulse = 1 + 0.5 * Math.sin(time * 4);
+      ctx.shadowBlur = 25 + 10 * Math.abs(Math.sin(time * 4));
       ctx.shadowColor = "rgba(255, 0, 136, 1)";
       ctx.fillStyle = "rgba(255, 0, 136, 1)";
+      circleRadius = 18 * currentPulse;
     } else if (isActive) {
-      // Active beat - green glow
-      ctx.shadowBlur = 15;
+      // Active beat - green glow with subtle pulse
+      ctx.shadowBlur = 15 * pulseAnimation;
       ctx.shadowColor = "rgba(0, 255, 136, 0.9)";
       ctx.fillStyle = `rgba(0, 255, 136, ${alpha})`;
     } else {
