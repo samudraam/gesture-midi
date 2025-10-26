@@ -1,0 +1,404 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Gesture Music (Tone.js + MediaPipe)</title>
+    <style>
+      body {
+        margin: 0;
+        font: 16px/1.4 system-ui;
+        background: #0b0f10;
+        color: #dfe6ee;
+      }
+      #videoContainer {
+        position: fixed;
+        inset: 0;
+        width: 100vw;
+        height: 100vh;
+        display: none;
+        background: #000;
+      }
+      #videoContainer.active {
+        display: block;
+      }
+      #cam {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+        opacity: 0;
+      }
+      #canvas {
+        position: absolute;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        pointer-events: none;
+      }
+      .card {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        padding: 16px 20px;
+        background: rgba(11, 15, 16, 0.95);
+        border: 2px solid rgba(0, 255, 136, 0.5);
+        border-radius: 12px;
+        z-index: 10;
+        text-align: center;
+        min-width: 300px;
+        transition: all 0.3s ease;
+        box-shadow: 0 0 30px rgba(0, 255, 136, 0.3);
+      }
+      #videoContainer.active ~ .card,
+      .card.video-active {
+        top: 20px;
+        transform: translateX(-50%);
+      }
+      #start {
+        padding: 12px 24px;
+        font-size: 16px;
+        background: #00ff88;
+        color: #0b0f10;
+        border: none;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        transition: all 0.2s;
+      }
+      #start:hover {
+        background: #00dd77;
+        transform: scale(1.05);
+      }
+      #readout {
+        margin-top: 12px;
+        font-size: 14px;
+        color: #dfe6ee;
+      }
+      .card.hidden {
+        display: none;
+      }
+
+      /* Mockup UI Elements */
+      .status-bar {
+        position: fixed;
+        top: 0;
+        left: 0;
+        right: 0;
+        height: 60px;
+        background: rgba(0, 0, 0, 0.8);
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 20px;
+        z-index: 100;
+        border-bottom: 1px solid #333;
+      }
+
+      .status-left {
+        display: flex;
+        align-items: center;
+        gap: 10px;
+      }
+
+      .status-right {
+        display: flex;
+        align-items: center;
+        gap: 20px;
+      }
+
+      .gesture-active {
+        color: #00ff88;
+        font-weight: 600;
+      }
+
+      .bpm-display {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .play-status {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .gesture-icon {
+        width: 40px;
+        height: 40px;
+        border-radius: 3px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 18px;
+      }
+
+      /* Side Panels */
+      .bpm-panel {
+        position: fixed;
+        top: 60px;
+        left: 0;
+        width: 300px;
+        height: calc(100vh - 140px);
+        border-right: 1px solid #333;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        z-index: 50;
+      }
+
+      .bpm-title {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+
+      .bpm-instruction {
+        font-size: 12px;
+        color: #888;
+        margin-bottom: 20px;
+        text-align: center;
+      }
+
+      .bpm-slider-container {
+        height: 500px;
+        width: 80px;
+        background: #333;
+        border-radius: 10px;
+        position: relative;
+        cursor: pointer;
+      }
+
+      .bpm-slider-fill {
+        position: absolute;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        background: #00ff88;
+        border-radius: 10px;
+        transition: height 0.1s ease;
+      }
+
+      .drums-panel {
+        position: fixed;
+        top: 60px;
+        right: 0;
+        width: 200px;
+        height: calc(100vh - 140px);
+        background: rgba(20, 20, 20, 0.9);
+        border-left: 1px solid #333;
+        padding: 20px;
+        display: flex;
+        flex-direction: column;
+        z-index: 50;
+      }
+
+      .drums-title {
+        font-size: 18px;
+        font-weight: 600;
+        margin-bottom: 8px;
+      }
+
+      .drums-instruction {
+        font-size: 12px;
+        color: #888;
+        margin-bottom: 20px;
+      }
+
+      .instrument-button {
+        width: 100%;
+        padding: 12px;
+        margin-bottom: 10px;
+        background: rgba(50, 50, 50, 0.8);
+        border: 1px solid #555;
+        border-radius: 8px;
+        color: #fff;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .instrument-button:hover {
+        background: rgba(70, 70, 70, 0.8);
+        border-color: #00ff88;
+      }
+
+      .instrument-button.active {
+        background: #00ff88;
+        color: #000;
+        border-color: #00ff88;
+      }
+
+      .save-pattern {
+        width: 100%;
+        padding: 12px;
+        margin-top: 20px;
+        background: transparent;
+        border: 1px solid #ff4444;
+        border-radius: 8px;
+        color: #ff4444;
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .save-pattern:hover {
+        background: #ff4444;
+        color: #fff;
+      }
+
+      /* Bottom Gesture Bar */
+      .gesture-bar {
+        position: fixed;
+        bottom: 0;
+        left: 0;
+        right: 0;
+        height: 80px;
+        background: rgba(20, 20, 20, 0.9);
+        border-top: 1px solid #333;
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        padding: 0 20px;
+        z-index: 50;
+      }
+
+      .gesture-controls {
+        display: flex;
+        gap: 30px;
+      }
+
+      .gesture-item {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+
+      .gesture-text {
+        font-size: 12px;
+      }
+
+      .gesture-actions {
+        display: flex;
+        gap: 20px;
+        align-items: center;
+      }
+
+      .action-button {
+        background: transparent;
+        border: none;
+        color: #fff;
+        cursor: pointer;
+        padding: 8px;
+        border-radius: 4px;
+        transition: background 0.2s ease;
+      }
+
+      .action-button:hover {
+        background: rgba(255, 255, 255, 0.1);
+      }
+    </style>
+    <!-- Tone.js -->
+    <script src="https://unpkg.com/tone@14.8.49/build/Tone.js"></script>
+    <!-- MediaPipe Tasks Vision (GestureRecognizer + HandLandmarker assets) -->
+    <script type="module">
+      import {
+        GestureRecognizer,
+        FilesetResolver,
+      } from "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.14";
+      window.GestureRecognizer = GestureRecognizer;
+      window.FilesetResolver = FilesetResolver;
+    </script>
+  </head>
+  <body>
+    <!-- Video Container -->
+    <div id="videoContainer">
+      <video id="cam" autoplay playsinline muted></video>
+      <canvas id="canvas"></canvas>
+    </div>
+
+    <!-- Start Card -->
+    <div class="card">
+      <button id="start">Start</button>
+      <div id="readout">BPM: – | fingers: – | pattern: –</div>
+    </div>
+
+    <!-- Status Bar -->
+    <div class="status-bar">
+      <div class="status-left">
+        <div class="gesture-icon">✋</div>
+        <span class="gesture-active">Gesture Midi</span>
+      </div>
+      <div class="status-right">
+        <div class="bpm-display">
+          <div class="gesture-icon">⏱️</div>
+          <span id="currentBPM">120 BPM</span>
+        </div>
+        <div class="play-status">
+          <div class="gesture-icon">⏸️</div>
+          <span id="playStatus">Paused</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- Left Panel - BPM Control -->
+    <div class="bpm-panel">
+      <div class="bpm-title">BPM</div>
+      <div class="bpm-instruction">Pinch and drag to set</div>
+      <div class="bpm-slider-container" id="bpmSlider">
+        <div class="bpm-slider-fill" id="bpmSliderFill"></div>
+      </div>
+    </div>
+
+    <!-- Right Panel - Drums -->
+    <div class="drums-panel">
+      <div class="drums-title">Drums</div>
+      <div class="drums-instruction">Click to choose</div>
+      <button class="instrument-button active" data-instrument="kick">
+        Kick
+      </button>
+      <button class="instrument-button" data-instrument="closedhihat">
+        Closed Hihat
+      </button>
+      <button class="instrument-button" data-instrument="openhihat">
+        Open Hihat
+      </button>
+      <button class="instrument-button" data-instrument="snare">Snare</button>
+      <button class="save-pattern">Save Pattern</button>
+    </div>
+
+    <!-- Bottom Gesture Bar -->
+    <div class="gesture-bar">
+      <div class="gesture-controls">
+        <div class="gesture-item">
+          <div class="gesture-icon">✌️</div>
+          <div class="gesture-text">
+            <div>Pinch</div>
+            <div>Toggle beat</div>
+          </div>
+        </div>
+        <div class="gesture-item">
+          <div class="gesture-icon">👋</div>
+          <div class="gesture-text">
+            <div>Open hand</div>
+            <div>Play sequence</div>
+          </div>
+        </div>
+        <div class="gesture-item">
+          <div class="gesture-icon">👆</div>
+          <div class="gesture-text">
+            <div>Pointer finger</div>
+            <div>Pause sequence</div>
+          </div>
+        </div>
+      </div>
+      <div class="gesture-actions">
+        <button class="action-button">×</button>
+        <button class="action-button" id="clearAll">🗑️ Clear All</button>
+        <button class="action-button">?</button>
+      </div>
+    </div>
+
+    <script src="sketch.js" type="module"></script>
+  </body>
+</html>
