@@ -223,7 +223,7 @@ function getBeatAtPinch(landmarks, centerX, centerY, radius) {
   if (!thumbTip) return -1;
 
   // Mirror the x-coordinate for gesture detection
-  const thumbX = canvas.width - (thumbTip.x * canvas.width);
+  const thumbX = canvas.width - thumbTip.x * canvas.width;
   const thumbY = thumbTip.y * canvas.height;
 
   // Check distance from thumb to circle center
@@ -386,11 +386,11 @@ function drawLandmarks(landmarks) {
     const b = landmarks[end];
     if (a && b) {
       // Mirror the x-coordinate
-      const aX = canvas.width - (a.x * canvas.width);
+      const aX = canvas.width - a.x * canvas.width;
       const aY = a.y * canvas.height;
-      const bX = canvas.width - (b.x * canvas.width);
+      const bX = canvas.width - b.x * canvas.width;
       const bY = b.y * canvas.height;
-      
+
       ctx.beginPath();
       ctx.moveTo(aX, aY);
       ctx.lineTo(bX, bY);
@@ -402,7 +402,7 @@ function drawLandmarks(landmarks) {
   for (let i = 0; i < landmarks.length; i++) {
     const lm = landmarks[i];
     // Mirror the x-coordinate
-    const x = canvas.width - (lm.x * canvas.width);
+    const x = canvas.width - lm.x * canvas.width;
     const y = lm.y * canvas.height;
 
     // Different colors for fingertips vs other points
@@ -433,9 +433,9 @@ function drawLandmarks(landmarks) {
 
   if (thumbTip && indexTip) {
     // Mirror the coordinates for display
-    const thumbX = canvas.width - (thumbTip.x * canvas.width);
+    const thumbX = canvas.width - thumbTip.x * canvas.width;
     const thumbY = thumbTip.y * canvas.height;
-    const indexX = canvas.width - (indexTip.x * canvas.width);
+    const indexX = canvas.width - indexTip.x * canvas.width;
     const indexY = indexTip.y * canvas.height;
 
     // Draw line between thumb and index
