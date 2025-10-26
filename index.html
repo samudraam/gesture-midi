@@ -135,17 +135,16 @@
       }
 
       /* Side Panels */
-      .bpm-panel {
+      .drums-panel {
         position: fixed;
         top: 60px;
         left: 0;
-        width: 300px;
+        width: 200px;
         height: calc(100vh - 140px);
         border-right: 1px solid #333;
         padding: 20px;
         display: flex;
         flex-direction: column;
-        align-items: center;
         z-index: 50;
       }
 
@@ -181,17 +180,18 @@
         transition: height 0.1s ease;
       }
 
-      .drums-panel {
+      .bpm-panel {
         position: fixed;
         top: 60px;
         right: 0;
-        width: 200px;
+        width: 300px;
         height: calc(100vh - 140px);
         background: rgba(20, 20, 20, 0.9);
         border-left: 1px solid #333;
         padding: 20px;
         display: flex;
         flex-direction: column;
+        align-items: center;
         z-index: 50;
       }
 
@@ -341,16 +341,7 @@
       </div>
     </div>
 
-    <!-- Left Panel - BPM Control -->
-    <div class="bpm-panel">
-      <div class="bpm-title">BPM</div>
-      <div class="bpm-instruction">Pinch and drag to set</div>
-      <div class="bpm-slider-container" id="bpmSlider">
-        <div class="bpm-slider-fill" id="bpmSliderFill"></div>
-      </div>
-    </div>
-
-    <!-- Right Panel - Drums -->
+    <!-- Left Panel - Drums -->
     <div class="drums-panel">
       <div class="drums-title">Drums</div>
       <div class="drums-instruction">Click to choose</div>
@@ -365,6 +356,15 @@
       </button>
       <button class="instrument-button" data-instrument="snare">Snare</button>
       <button class="save-pattern">Save Pattern</button>
+    </div>
+
+    <!-- Right Panel - BPM Control -->
+    <div class="bpm-panel">
+      <div class="bpm-title">BPM</div>
+      <div class="bpm-instruction">Pinch and drag to set</div>
+      <div class="bpm-slider-container" id="bpmSlider">
+        <div class="bpm-slider-fill" id="bpmSliderFill"></div>
+      </div>
     </div>
 
     <!-- Bottom Gesture Bar -->
