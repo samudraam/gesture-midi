@@ -247,113 +247,82 @@ function getBeatAtPinch(landmarks, centerX, centerY, radius) {
 }
 
 /**
- * Draws a single large circle interface with pulsing animations
+ * Draws nested circles showing all instruments simultaneously
  */
 function drawCircleInterface() {
   const centerX = canvas.width / 2;
   const centerY = canvas.height / 2;
-  const radius = Math.min(canvas.width, canvas.height) * 0.35;
-
-  // Draw circle outline
-  ctx.strokeStyle = "rgba(0, 255, 136, 0.6)";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
-  ctx.stroke();
+  const outerRadius = Math.min(canvas.width, canvas.height) * 0.35;
+  const innerRadius = outerRadius * 0.6; // Inner circle for other instruments
 
   // Get current time for animation
   const time = Date.now() / 1000;
-
-  // Draw beat pulses around the circle
-  const numBeats = 16;
-  for (let i = 0; i < numBeats; i++) {
-    const angle = (i / numBeats) * Math.PI * 2 - Math.PI / 2;
-    const x = centerX + Math.cos(angle) * radius;
-    const y = centerY + Math.sin(angle) * radius;
-
-    // Get the current instrument's pattern
-    let currentPattern;
-    switch (selectedInstrument) {
-      case "kick":
-        currentPattern = kickSteps;
-        break;
-      case "closedhihat":
-        currentPattern = closedHihatSteps;
-        break;
-      case "openhihat":
-        currentPattern = openHihatSteps;
-        break;
-      case "snare":
-        currentPattern = snareSteps;
-        break;
-      default:
-        currentPattern = kickSteps;
+  
+  // Define all instrument patterns with their colors
+  const instruments = [
+    { name: "kick", pattern: kickSteps, color: "rgba(0, 255, 136, 0.9)", shadowColor: "rgba(0, 255, 136, 0.9)" },
+    { name: "snare", pattern: snareSteps, color: "rgba(255, 100, 0, 0.7)", shadowColor: "rgba(255, 100, 0, 0.7)" },
+    { name: "closedhihat", pattern: closedHihatSteps, color: "rgba(255, 200, 0, 0.7)", shadowColor: "rgba(255, 200, 0, 0.7)" },
+    { name: "openhihat", pattern: openHihatSteps, color: "rgba(255, 150, 50, 0.7)", shadowColor: "rgba(255, 150, 50, 0.7)" },
+  ];
+  
+  // Draw all instruments in nested circles
+  const radii = [outerRadius, innerRadius];
+  
+  for (let instIdx = 0; instIdx < instruments.length; instIdx++) {
+    const instrument = instruments[instIdx];
+    const drawRadius = radii[instIdx % 2]; // Alternate between outer and inner
+    
+    for (let i = 0; i < 16; i++) {
+      const angle = (i / 16) * Math.PI * 2 - Math.PI / 2;
+      const x = centerX + Math.cos(angle) * drawRadius;
+      const y = centerY + Math.sin(angle) * drawRadius;
+      
+      const isActive = instrument.pattern[i] === 1;
+      const isCurrent = i === currentStep && isPlaying && isActive;
+      const isSelected = i === selectedBeat;
+      
+      if (!isActive) continue; // Skip inactive beats
+      
+      // Pulsing animation for all active beats
+      let pulseAnimation = 1;
+      if (isCurrent) {
+        pulseAnimation = 1 + 0.5 * Math.sin(time * 4);
+      } else {
+        pulseAnimation = 1 + 0.3 * Math.sin(time * 2 + (i * Math.PI) / 8);
+      }
+      
+      let circleRadius = 6 * pulseAnimation;
+      
+      // Draw the circle
+      if (isCurrent && selectedInstrument === instrument.name) {
+        // Currently playing beat - hot pink pulse with strong animation
+        const currentPulse = 1 + 0.5 * Math.sin(time * 4);
+        ctx.shadowBlur = 25 + 10 * Math.abs(Math.sin(time * 4));
+        ctx.shadowColor = "rgba(255, 0, 136, 1)";
+        ctx.fillStyle = "rgba(255, 0, 136, 1)";
+        circleRadius = 10 * currentPulse;
+      } else if (selectedInstrument === instrument.name) {
+        // Selected instrument - bright green glow
+        ctx.shadowBlur = 15 * pulseAnimation;
+        ctx.shadowColor = instrument.shadowColor;
+        ctx.fillStyle = "rgba(0, 255, 136, 0.95)";
+        circleRadius = 8 * pulseAnimation;
+      } else {
+        // Other instruments - their own colors
+        ctx.shadowBlur = 10 * pulseAnimation;
+        ctx.shadowColor = instrument.shadowColor;
+        ctx.fillStyle = instrument.color;
+        circleRadius = 6 * pulseAnimation;
+      }
+      
+      ctx.beginPath();
+      ctx.arc(x, y, circleRadius, 0, Math.PI * 2);
+      ctx.fill();
     }
-
-    const isActive = currentPattern[i] === 1;
-    const isCurrent = i === currentStep && isPlaying;
-    const isSelected = i === selectedBeat;
-
-    // Pulsing animation for all active beats
-    let pulseAnimation = 1;
-    if (isActive && isPlaying) {
-      // Animate with a subtle pulsing effect using sine wave
-      // Different phase for each beat (i * PI/8) creates a wave around the circle
-      pulseAnimation = 1 + 0.3 * Math.sin(time * 2 + (i * Math.PI) / 8);
-    }
-
-    let circleRadius = 6; // Inactive beat - small
-    let alpha = 0.6;
-
-    if (isActive) {
-      alpha = 0.95;
-      circleRadius = 12 * pulseAnimation; // Active beat - bigger with pulse
-    }
-
-    if (isCurrent && isActive) {
-      // Currently playing - extra pulse effect
-      circleRadius = 18 * pulseAnimation;
-      alpha = 1;
-    }
-
-    // Draw beat circle with glow
-    if (isCurrent && isActive) {
-      // Currently playing beat - pink pulse with stronger animation
-      const currentPulse = 1 + 0.5 * Math.sin(time * 4);
-      ctx.shadowBlur = 25 + 10 * Math.abs(Math.sin(time * 4));
-      ctx.shadowColor = "rgba(255, 0, 136, 1)";
-      ctx.fillStyle = "rgba(255, 0, 136, 1)";
-      circleRadius = 18 * currentPulse;
-    } else if (isActive) {
-      // Active beat - green glow with subtle pulse
-      ctx.shadowBlur = 15 * pulseAnimation;
-      ctx.shadowColor = "rgba(0, 255, 136, 0.9)";
-      ctx.fillStyle = `rgba(0, 255, 136, ${alpha})`;
-    } else {
-      // Inactive beat - small green, no glow
-      ctx.shadowBlur = 0;
-      ctx.fillStyle = `rgba(0, 255, 136, ${alpha})`;
-    }
-
-    ctx.beginPath();
-    ctx.arc(x, y, circleRadius, 0, Math.PI * 2);
-    ctx.fill();
   }
 
   ctx.shadowBlur = 0;
-
-  // Draw center info
-  ctx.font = "bold 20px system-ui";
-  ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
-  ctx.textAlign = "center";
-  ctx.fillText(selectedInstrument.toUpperCase(), centerX, centerY - 10);
-
-  // Draw pinch instruction
-  if (!isPlaying) {
-    ctx.font = "14px system-ui";
-    ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
-    ctx.fillText("Pinch to start", centerX, centerY + 30);
-  }
 }
 
 /**
