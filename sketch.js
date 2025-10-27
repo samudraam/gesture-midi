@@ -6,32 +6,39 @@ const closedHihat = new Tone.NoiseSynth({
 }).toDestination();
 const openHihat = new Tone.NoiseSynth({
   noise: { type: "white" },
-  envelope: { attack: 0.001, decay: 0.2, sustain: 0.1, release: 0.3 },
+  envelope: { attack: 0.0001, decay: 0.2, sustain: 0.1, release: 0.3 },
 }).toDestination();
 
 /**
  * Grid pattern presets - different densities based on pinch distance
  * Each pattern represents a density level (sparse to dense)
+ *
+ * COMMENTED OUT - No longer used, only pinch for beat toggling
  */
+/*
 const patternDensities = [
   [1, 0, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0], // 2/16 - very open pinch
   [1, 0, 0, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 0, 0], // 4/16
   [1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 1, 0, 0, 1, 0, 0], // 6/16
-  [1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0], // 10/16 - pinch closed
+  [1, 0, 1, 0, 1, 1, 0, 1, 1, 0, 1, 0, 1, 0, 1, 0] // 10/16 - pinch closed
 ];
 
 const densityLabels = ["Sparse", "Medium", "Dense", "Very Dense"];
+*/
 
 let kickSteps = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // All beats off by default
 let closedHihatSteps = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // Closed hihat pattern
 let openHihatSteps = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // Open hihat pattern
 let snareSteps = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0]; // Snare pattern
 let currentStep = 0;
-let currentDensity = 0; // Track which density pattern (0-3)
+// let currentDensity = 0; // Track which density pattern (0-3) - NO LONGER USED
 let isPlaying = false;
 let lastPinchDistance = null;
 let currentBPM = 120;
 let selectedInstrument = "kick"; // Track which instrument is being edited
+let lastBeatTime = {}; // Track when each beat position was last played
+let falling = []; // Falling particles from beats
+let wasAdjustingBPM = false; // Track if was previously adjusting BPM
 
 const hatSteps = [1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0, 1, 0];
 
@@ -52,6 +59,48 @@ let wasPinching = false; // Track if was previously pinching
 const seq = new Tone.Sequence(
   (time, stepIndex) => {
     currentStep = stepIndex;
+
+    // Check if any instrument is active at this beat position
+    const hasActiveBeat =
+      kickSteps[stepIndex] ||
+      closedHihatSteps[stepIndex] ||
+      openHihatSteps[stepIndex] ||
+      snareSteps[stepIndex];
+
+    // Record when this beat position was triggered and create falling particle
+    if (hasActiveBeat && isPlaying) {
+      lastBeatTime[stepIndex] = Date.now();
+
+      const centerX = canvas.width / 2;
+      const centerY = canvas.height / 2;
+      const radius = Math.min(canvas.width, canvas.height) * 0.3;
+      const angle = (stepIndex / 16) * Math.PI * 2 - Math.PI / 2;
+      const x = centerX + Math.cos(angle) * radius;
+      const y = centerY + Math.sin(angle) * radius;
+      const curveDir = Math.random() < 0.5 ? -1 : 1;
+
+      // Determine which instrument triggered this particle
+      let instrument;
+      if (snareSteps[stepIndex]) {
+        instrument = "snare";
+      } else if (closedHihatSteps[stepIndex]) {
+        instrument = "closedhihat";
+      } else if (openHihatSteps[stepIndex]) {
+        instrument = "openhihat";
+      } else {
+        instrument = "kick";
+      }
+
+      falling.push({
+        x: x,
+        y: y,
+        t: 0,
+        angle: angle,
+        curve: curveDir,
+        instrument: instrument,
+      });
+    }
+
     // Ensure time is always positive and valid
     const safeTime = Math.max(0, time);
     if (!isFinite(safeTime) || safeTime < 0) return;
@@ -198,10 +247,57 @@ function getPinchDistance(landmarks) {
 }
 
 /**
+ * Checks if hand is near the BPM slider panel
+ * @param {Array} landmarks - Hand landmarks
+ * @returns {boolean} True if hand is near BPM slider
+ */
+function isHandNearBPMSlider(landmarks) {
+  const indexTip = landmarks[8]; // Index finger tip
+  if (!indexTip) return false;
+
+  // Mirror x coordinate for display
+  const x = canvas.width - indexTip.x * canvas.width;
+  const y = indexTip.y * canvas.height;
+
+  // BPM slider is positioned at the right side of the screen
+  // Width of screen minus BPM panel width (300px) determines left edge
+  const bpmPanelLeft = canvas.width - 300;
+
+  // Check if hand is in the right panel area
+  return x >= bpmPanelLeft && x <= canvas.width;
+}
+
+/**
+ * Gets normalized vertical position (0-1) for BPM adjustment when near slider
+ * @param {Array} landmarks - Hand landmarks
+ * @returns {number|null} Normalized Y position or null if not near slider
+ */
+function getBPMSliderYPosition(landmarks) {
+  const indexTip = landmarks[8]; // Index finger tip
+  if (!indexTip) return null;
+
+  // Mirror x coordinate for display
+  const x = canvas.width - indexTip.x * canvas.width;
+  const bpmPanelLeft = canvas.width - 300;
+
+  // Only return position if near BPM slider
+  if (x < bpmPanelLeft || x > canvas.width) return null;
+
+  // Get Y position (0-1) where 0 is top of slider area (60px status bar), 1 is bottom
+  const y = indexTip.y;
+  const normalizedY = Math.max(0, Math.min(1, (y - 0.08) / 0.84)); // Roughly 60px-80px from top to bottom
+
+  return normalizedY;
+}
+
+/**
  * Maps pinch distance to pattern density
  * @param {number} distance - Pinch distance in pixels
  * @returns {number} Density index (0-3)
+ *
+ * COMMENTED OUT - No longer used, only pinch for beat toggling
  */
+/*
 function getPinchDensity(distance) {
   // Map distance: 0-50px = dense (3), 50-100px = medium (1-2), 100+px = sparse (0)
   if (distance < 50) return 3;
@@ -209,6 +305,7 @@ function getPinchDensity(distance) {
   if (distance < 150) return 1;
   return 0;
 }
+*/
 
 /**
  * Detects which beat vertex is being pinched based on hand position
@@ -247,82 +344,170 @@ function getBeatAtPinch(landmarks, centerX, centerY, radius) {
 }
 
 /**
- * Draws nested circles showing all instruments simultaneously
+ * Draws a single large circle interface with pulsing animations
  */
 function drawCircleInterface() {
   const centerX = canvas.width / 2;
   const centerY = canvas.height / 2;
-  const outerRadius = Math.min(canvas.width, canvas.height) * 0.35;
-  const innerRadius = outerRadius * 0.6; // Inner circle for other instruments
+  const radius = Math.min(canvas.width, canvas.height) * 0.35;
+
+  // Draw circle outline
+  // ctx.strokeStyle = "rgba(0, 255, 136, 0.6)";
+  // ctx.lineWidth = 3;
+  // ctx.beginPath();
+  // ctx.arc(centerX, centerY, radius, 0, Math.PI * 2);
+  // ctx.stroke();
 
   // Get current time for animation
   const time = Date.now() / 1000;
-  
-  // Define all instrument patterns with their colors
-  const instruments = [
-    { name: "kick", pattern: kickSteps, color: "rgba(0, 255, 136, 0.9)", shadowColor: "rgba(0, 255, 136, 0.9)" },
-    { name: "snare", pattern: snareSteps, color: "rgba(255, 100, 0, 0.7)", shadowColor: "rgba(255, 100, 0, 0.7)" },
-    { name: "closedhihat", pattern: closedHihatSteps, color: "rgba(255, 200, 0, 0.7)", shadowColor: "rgba(255, 200, 0, 0.7)" },
-    { name: "openhihat", pattern: openHihatSteps, color: "rgba(255, 150, 50, 0.7)", shadowColor: "rgba(255, 150, 50, 0.7)" },
-  ];
-  
-  // Draw all instruments in nested circles
-  const radii = [outerRadius, innerRadius];
-  
-  for (let instIdx = 0; instIdx < instruments.length; instIdx++) {
-    const instrument = instruments[instIdx];
-    const drawRadius = radii[instIdx % 2]; // Alternate between outer and inner
-    
-    for (let i = 0; i < 16; i++) {
-      const angle = (i / 16) * Math.PI * 2 - Math.PI / 2;
-      const x = centerX + Math.cos(angle) * drawRadius;
-      const y = centerY + Math.sin(angle) * drawRadius;
-      
-      const isActive = instrument.pattern[i] === 1;
-      const isCurrent = i === currentStep && isPlaying && isActive;
-      const isSelected = i === selectedBeat;
-      
-      if (!isActive) continue; // Skip inactive beats
-      
-      // Pulsing animation for all active beats
-      let pulseAnimation = 1;
-      if (isCurrent) {
-        pulseAnimation = 1 + 0.5 * Math.sin(time * 4);
-      } else {
-        pulseAnimation = 1 + 0.3 * Math.sin(time * 2 + (i * Math.PI) / 8);
-      }
-      
-      let circleRadius = 6 * pulseAnimation;
-      
-      // Draw the circle
-      if (isCurrent && selectedInstrument === instrument.name) {
-        // Currently playing beat - hot pink pulse with strong animation
-        const currentPulse = 1 + 0.5 * Math.sin(time * 4);
-        ctx.shadowBlur = 25 + 10 * Math.abs(Math.sin(time * 4));
-        ctx.shadowColor = "rgba(255, 0, 136, 1)";
-        ctx.fillStyle = "rgba(255, 0, 136, 1)";
-        circleRadius = 10 * currentPulse;
-      } else if (selectedInstrument === instrument.name) {
-        // Selected instrument - bright green glow
-        ctx.shadowBlur = 15 * pulseAnimation;
-        ctx.shadowColor = instrument.shadowColor;
-        ctx.fillStyle = "rgba(0, 255, 136, 0.95)";
-        circleRadius = 8 * pulseAnimation;
-      } else {
-        // Other instruments - their own colors
-        ctx.shadowBlur = 10 * pulseAnimation;
-        ctx.shadowColor = instrument.shadowColor;
-        ctx.fillStyle = instrument.color;
-        circleRadius = 6 * pulseAnimation;
-      }
-      
-      ctx.beginPath();
-      ctx.arc(x, y, circleRadius, 0, Math.PI * 2);
-      ctx.fill();
+
+  // Draw beat pulses around the circle
+  const numBeats = 16;
+  for (let i = 0; i < numBeats; i++) {
+    const angle = (i / numBeats) * Math.PI * 2 - Math.PI / 2;
+    const x = centerX + Math.cos(angle) * radius;
+    const y = centerY + Math.sin(angle) * radius;
+
+    // Get the current instrument's pattern
+    let currentPattern;
+    switch (selectedInstrument) {
+      case "kick":
+        currentPattern = kickSteps;
+        break;
+      case "closedhihat":
+        currentPattern = closedHihatSteps;
+        break;
+      case "openhihat":
+        currentPattern = openHihatSteps;
+        break;
+      case "snare":
+        currentPattern = snareSteps;
+        break;
+      default:
+        currentPattern = kickSteps;
     }
+
+    const isActive = currentPattern[i] === 1;
+    const isCurrent = i === currentStep && isPlaying;
+    const isSelected = i === selectedBeat;
+
+    // Pulse only happens when beat is triggered
+    let pulseAnimation = 1;
+    if (lastBeatTime[i]) {
+      const timeSinceBeat = Date.now() - lastBeatTime[i];
+      if (timeSinceBeat < 200) {
+        // Pulse for 200ms after beat trigger
+        pulseAnimation = 1 + 0.5 * (1 - timeSinceBeat / 200);
+      }
+    }
+
+    let circleRadius = 6; // Inactive beat - small
+    let alpha = 0.6;
+
+    if (isActive) {
+      alpha = 0.95;
+      circleRadius = 12 * pulseAnimation; // Active beat - bigger with pulse
+    }
+
+    if (isCurrent && isActive) {
+      // Currently playing - extra pulse effect
+      circleRadius = 18 * pulseAnimation;
+      alpha = 1;
+    }
+
+    // Draw beat circle with glow
+    if (isCurrent && isActive) {
+      // Currently playing beat - pink pulse
+      ctx.shadowBlur = 25;
+      ctx.shadowColor = "rgba(255, 0, 136, 1)";
+      ctx.fillStyle = "rgba(255, 0, 136, 1)";
+    } else if (isActive) {
+      // Active beat - green glow with subtle pulse
+      ctx.shadowBlur = 15 * pulseAnimation;
+      ctx.shadowColor = "rgba(0, 255, 136, 0.9)";
+      ctx.fillStyle = `rgba(0, 255, 136, ${alpha})`;
+    } else {
+      // Inactive beat - small green, no glow
+      ctx.shadowBlur = 0;
+      ctx.fillStyle = `rgba(0, 255, 136, ${alpha})`;
+    }
+
+    ctx.beginPath();
+    ctx.arc(x, y, circleRadius, 0, Math.PI * 2);
+    ctx.fill();
   }
 
   ctx.shadowBlur = 0;
+
+  // Draw center info
+  ctx.font = "bold 20px system-ui";
+  ctx.fillStyle = "rgba(255, 255, 255, 0.9)";
+  ctx.textAlign = "center";
+  ctx.fillText(selectedInstrument.toUpperCase(), centerX, centerY - 10);
+
+  // Draw pinch instruction
+  if (!isPlaying) {
+    ctx.font = "14px system-ui";
+    ctx.fillStyle = "rgba(255, 255, 255, 0.6)";
+    ctx.fillText("Pinch to start", centerX, centerY + 30);
+  }
+}
+
+/**
+ * Draws and animates falling particles from beats
+ */
+function drawFallingParticles() {
+  const centerX = canvas.width / 2;
+  const centerY = canvas.height / 2;
+
+  for (let i = falling.length - 1; i >= 0; i--) {
+    let obj = falling[i];
+    obj.t += 0.02;
+
+    let prog = obj.t * obj.t;
+    let curvature = 60 * Math.sin(Math.PI * prog) * obj.curve;
+    let perpAngle = obj.angle + (Math.PI / 2) * obj.curve;
+    let fx = obj.x + (centerX - obj.x) * prog + curvature * Math.cos(perpAngle);
+    let fy = obj.y + (centerY - obj.y) * prog + curvature * Math.sin(perpAngle);
+
+    let fade = 80 * (1 - prog);
+    let size = 8 * (1 - prog) + 2;
+
+    // Assign color based on instrument
+    let particleColor;
+    switch (obj.instrument) {
+      case "kick":
+        particleColor = "rgba(77,238,234, "; // Blue
+        break;
+      case "snare":
+        particleColor = "rgba(255, 100, 0, "; // Orange
+        break;
+      case "closedhihat":
+        particleColor = "rgba(255, 200, 0, "; // Yellow
+        break;
+      case "openhihat":
+        particleColor = "rgba(240,0,255, "; // Orange-Yellow
+        break;
+      default:
+        particleColor = "rgba(0, 255, 136, "; // Default green
+    }
+
+    // Draw blurred trail effect
+    for (let b = 5; b > 0; b--) {
+      ctx.fillStyle = particleColor + fade * (5 - b) * 0.01 + ")";
+      ctx.beginPath();
+      ctx.arc(fx, fy, size + b * 1, 0, Math.PI * 2);
+      ctx.fill();
+    }
+
+    // Draw main particle
+    ctx.fillStyle = particleColor + fade / 100 + ")";
+    ctx.beginPath();
+    ctx.arc(fx, fy, size, 0, Math.PI * 2);
+    ctx.fill();
+
+    if (obj.t >= 1) falling.splice(i, 1);
+  }
 }
 
 /**
@@ -460,6 +645,7 @@ function loop() {
 
   ctx.clearRect(0, 0, canvas.width, canvas.height);
   drawCircleInterface();
+  drawFallingParticles();
 
   const now = performance.now();
   const res = recognizer.recognizeForVideo(video, now);
@@ -505,76 +691,110 @@ function loop() {
       }
       wasPinching = false;
     } else if (pinchDist !== null && pinchDist < 80) {
-      // Close pinch detected - beat selection/toggle mode
-      const centerX = canvas.width / 2;
-      const centerY = canvas.height / 2;
-      const radius = Math.min(canvas.width, canvas.height) * 0.35;
+      // Close pinch detected - check if near BPM slider
+      const nearBPM = isHandNearBPMSlider(lm);
 
-      const beatAtPinch = getBeatAtPinch(lm, centerX, centerY, radius);
+      if (nearBPM) {
+        // Adjust BPM based on vertical hand position while pinching
+        const sliderY = getBPMSliderYPosition(lm);
 
-      // DEBUG: Show pinch detection in real-time
-      if (beatAtPinch >= 0) {
-        readout.textContent = `🫶 PINCHING | Distance: ${Math.round(
-          pinchDist
-        )}px | Beat: ${beatAtPinch + 1} | Status: ${
-          wasPinching ? "holding" : "pressed"
-        }`;
-      } else {
-        readout.textContent = `🫶 PINCH TOO FAR | Distance: ${Math.round(
-          pinchDist
-        )}px (need < 80px)`;
-      }
+        if (sliderY !== null) {
+          // Map vertical position to BPM (top = 180 BPM, bottom = 60 BPM)
+          // Invert because Y=0 is top, we want higher BPM at top
+          const newBPM = Math.round(60 + (1 - sliderY) * 120);
+          currentBPM = Math.max(60, Math.min(180, newBPM));
 
-      // Toggle beat on first pinch detection
-      if (!wasPinching && beatAtPinch >= 0) {
-        // Get the current instrument's pattern
-        let currentPattern;
-        switch (selectedInstrument) {
-          case "kick":
-            currentPattern = kickSteps;
-            break;
-          case "closedhihat":
-            currentPattern = closedHihatSteps;
-            break;
-          case "openhihat":
-            currentPattern = openHihatSteps;
-            break;
-          case "snare":
-            currentPattern = snareSteps;
-            break;
-          default:
-            currentPattern = kickSteps;
-        }
-
-        // Toggle the beat on/off for the selected instrument
-        currentPattern[beatAtPinch] = currentPattern[beatAtPinch] === 1 ? 0 : 1;
-        selectedBeat = beatAtPinch;
-        lastPinchBeat = beatAtPinch;
-        wasPinching = true;
-
-        // Start playback if stopped
-        if (!isPlaying) {
           try {
-            seq.start(0);
-            Tone.Transport.start();
+            Tone.Transport.bpm.rampTo(currentBPM, 0.1);
           } catch (e) {
             // Ignore timing errors
           }
-          isPlaying = true;
-          if (playStatusDisplay) playStatusDisplay.textContent = "Playing";
+          updateBPMSlider();
+
+          readout.textContent = `🎵 BPM: ${currentBPM} | Pinch: ${Math.round(
+            pinchDist
+          )}px`;
         }
 
-        const density = currentPattern.reduce((a, b) => a + b, 0);
-        readout.textContent = `✨ ${selectedInstrument.toUpperCase()} Beat ${
-          beatAtPinch + 1
-        } ${
-          currentPattern[beatAtPinch] === 1 ? "ON" : "OFF"
-        } | Pattern: ${density}/16`;
+        wasAdjustingBPM = true;
+        wasPinching = false;
+        lastPinchDistance = null; // Don't track for BPM adjustment
+      } else {
+        // Beat toggle mode
+        const centerX = canvas.width / 2;
+        const centerY = canvas.height / 2;
+        const radius = Math.min(canvas.width, canvas.height) * 0.35;
+
+        const beatAtPinch = getBeatAtPinch(lm, centerX, centerY, radius);
+
+        // DEBUG: Show pinch detection in real-time
+        if (beatAtPinch >= 0) {
+          readout.textContent = `🫶 PINCHING | Distance: ${Math.round(
+            pinchDist
+          )}px | Beat: ${beatAtPinch + 1} | Status: ${
+            wasPinching ? "holding" : "pressed"
+          }`;
+        } else {
+          readout.textContent = `🫶 PINCH TOO FAR | Distance: ${Math.round(
+            pinchDist
+          )}px (need < 80px)`;
+        }
+
+        // Toggle beat on first pinch detection
+        if (!wasPinching && beatAtPinch >= 0) {
+          // Get the current instrument's pattern
+          let currentPattern;
+          switch (selectedInstrument) {
+            case "kick":
+              currentPattern = kickSteps;
+              break;
+            case "closedhihat":
+              currentPattern = closedHihatSteps;
+              break;
+            case "openhihat":
+              currentPattern = openHihatSteps;
+              break;
+            case "snare":
+              currentPattern = snareSteps;
+              break;
+            default:
+              currentPattern = kickSteps;
+          }
+
+          // Toggle the beat on/off for the selected instrument
+          currentPattern[beatAtPinch] =
+            currentPattern[beatAtPinch] === 1 ? 0 : 1;
+          selectedBeat = beatAtPinch;
+          lastPinchBeat = beatAtPinch;
+          wasPinching = true;
+
+          // Start playback if stopped
+          if (!isPlaying) {
+            try {
+              seq.start(0);
+              Tone.Transport.start();
+            } catch (e) {
+              // Ignore timing errors
+            }
+            isPlaying = true;
+            if (playStatusDisplay) playStatusDisplay.textContent = "Playing";
+          }
+
+          const density = currentPattern.reduce((a, b) => a + b, 0);
+          readout.textContent = `✨ ${selectedInstrument.toUpperCase()} Beat ${
+            beatAtPinch + 1
+          } ${
+            currentPattern[beatAtPinch] === 1 ? "ON" : "OFF"
+          } | Pattern: ${density}/16`;
+        }
       }
     } else {
       // No pinch detected or open hand
       wasPinching = false;
       selectedBeat = -1;
+      lastPinchDistance = null; // Reset pinch distance tracking
+      wasAdjustingBPM = false;
+
       if (pinchDist !== null) {
         // Show open hand pinch distance
         readout.textContent = `👐 OPEN HAND | Distance: ${Math.round(
