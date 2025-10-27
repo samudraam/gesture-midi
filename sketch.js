@@ -98,6 +98,7 @@ const seq = new Tone.Sequence(
         angle: angle,
         curve: curveDir,
         instrument: instrument,
+        path: [{ x: x, y: y }], // Track path for streak
       });
     }
 
@@ -470,6 +471,13 @@ function drawFallingParticles() {
     let fx = obj.x + (centerX - obj.x) * prog + curvature * Math.cos(perpAngle);
     let fy = obj.y + (centerY - obj.y) * prog + curvature * Math.sin(perpAngle);
 
+    // Add current position to path
+    obj.path.push({ x: fx, y: fy });
+    // Keep only last 20 points for streak
+    if (obj.path.length > 20) {
+      obj.path.shift();
+    }
+
     let fade = 80 * (1 - prog);
     let size = 8 * (1 - prog) + 2;
 
@@ -492,11 +500,24 @@ function drawFallingParticles() {
         particleColor = "rgba(0, 255, 136, "; // Default green
     }
 
+    // Draw streak trail
+    if (obj.path.length > 1) {
+      ctx.strokeStyle = particleColor + (fade * 0.5) / 100 + ")";
+      ctx.lineWidth = 4;
+      ctx.lineCap = "round";
+      ctx.beginPath();
+      ctx.moveTo(obj.path[0].x, obj.path[0].y);
+      for (let p = 1; p < obj.path.length; p++) {
+        ctx.lineTo(obj.path[p].x, obj.path[p].y);
+      }
+      ctx.stroke();
+    }
+
     // Draw blurred trail effect
     for (let b = 5; b > 0; b--) {
-      ctx.fillStyle = particleColor + fade * (5 - b) * 0.01 + ")";
+      ctx.fillStyle = particleColor + fade * (5 - b) * 0.011 + ")";
       ctx.beginPath();
-      ctx.arc(fx, fy, size + b * 1, 0, Math.PI * 2);
+      ctx.arc(fx, fy, size + b * 2, 0, Math.PI * 2);
       ctx.fill();
     }
 
