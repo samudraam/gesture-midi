@@ -431,7 +431,8 @@ function getBeatAtPinch(lm, cx, cy, r) {
 let chromaticRects = [],
   timelineSlots = [],
   activeDrag = null,
-  hoverSlotIdx = -1;
+  hoverSlotIdx = -1,
+  snappedSlotIdx = -1;
 
 const CH_DOT_R = 16;
 const CH_SPREAD_PAD = 32;
@@ -869,7 +870,7 @@ function loop() {
     } else if (currentMode === "drums") {
       handleDrumPinch(lm);
     } else {
-      handleStringsGestures(lm);
+      handleStringsGestures(lm, fingers);
     }
 
     drawLandmarks(lm);
@@ -877,6 +878,7 @@ function loop() {
     pinchActive = false;
     activeDrag = null;
     hoverSlotIdx = -1;
+    snappedSlotIdx = -1;
   }
 
   requestAnimationFrame(loop);
@@ -928,33 +930,40 @@ function handleDrumPinch(lm) {
   }
 }
 
-// ---------- STRINGS GESTURES (audition + drop tok + forgiving snap + delete below timeline)
+// ---------- STRINGS GESTURES (magnetic snap S2 + D-B drop + delete zone)
 // Global delete zone: y > timelineBottomY + DELETE_MARGIN_PX
-function handleStringsGestures(lm) {
+function handleStringsGestures(lm, fingers) {
   const i = lm[8];
   if (!i) {
     activeDrag = null;
     hoverSlotIdx = -1;
+    snappedSlotIdx = -1;
     return;
   }
   const px = canvas.width - i.x * canvas.width,
     py = i.y * canvas.height;
 
-  // hover detection over slots
-  hoverSlotIdx = -1;
+  // Determine closest slot within forgiving hitbox for magnetic snap
+  let nearestIdx = -1,
+    nearestDist = Infinity;
   for (const sl of timelineSlots) {
-    const halfW = sl.sectionW * SNAP_H_RATIO,
-      halfH = SNAP_V_PX;
-    if (
-      Math.abs(px - sl.centerX) <= halfW &&
-      Math.abs(py - sl.centerY) <= halfH
-    ) {
-      hoverSlotIdx = sl.idx;
-      break;
+    const dx = Math.abs(px - sl.centerX);
+    const dy = Math.abs(py - sl.centerY);
+    const halfW = sl.sectionW * SNAP_H_RATIO;
+    if (dx <= halfW && dy <= SNAP_V_PX) {
+      const d = dx + dy * 1.25; // slight weight to vertical
+      if (d < nearestDist) {
+        nearestDist = d;
+        nearestIdx = sl.idx;
+      }
     }
   }
 
+  // hover visualization (line highlight)
+  hoverSlotIdx = nearestIdx;
+
   if (pinchActive) {
+    // START DRAG (must begin with pinch)
     if (!activeDrag) {
       // start from chromatic row?
       const hit = chromaticRects.find(
@@ -998,54 +1007,46 @@ function handleStringsGestures(lm) {
         }
       }
     } else {
-      // Update ghost position - snap to hovered slot if over one
-      if (hoverSlotIdx >= 0) {
-        // Snap to the hovered slot center
-        const targetSlot = timelineSlots.find((s) => s.idx === hoverSlotIdx);
-        if (targetSlot) {
-          activeDrag.ghostX = targetSlot.centerX;
-          activeDrag.ghostY = targetSlot.centerY;
-        } else {
-          // Fallback to pointer position
-          activeDrag.ghostX = px;
-          activeDrag.ghostY = py;
-        }
+      // UPDATE DRAG
+      activeDrag.ghostX = px;
+      activeDrag.ghostY = py;
+
+      // Live magnetic snap: attach if near; allow unsnap only while still pinching
+      if (nearestIdx >= 0) {
+        snappedSlotIdx = nearestIdx;
       } else {
-        // Not over any slot - use pointer position
-        activeDrag.ghostX = px;
-        activeDrag.ghostY = py;
+        // unsnap allowed only while pinching
+        snappedSlotIdx = -1;
       }
     }
   } else {
-    // release: try drop, else delete if below zone, else return if lifted from slot
+    // NOT PINCHING: DROP or DELETE
     if (activeDrag) {
-      let dropped = false;
       const inDeleteZone = py > timelineBottomY + DELETE_MARGIN_PX;
 
-      if (!inDeleteZone && hoverSlotIdx >= 0) {
-        stringTimeline[hoverSlotIdx] = activeDrag.noteIndex;
-        dropped = true;
+      if (inDeleteZone) {
+        // delete: do nothing (note removed)
+      } else if (snappedSlotIdx >= 0) {
+        stringTimeline[snappedSlotIdx] = activeDrag.noteIndex;
         try {
           tok.triggerAttackRelease("C5", "16n");
         } catch {}
-      }
-
-      if (
-        !dropped &&
-        !inDeleteZone &&
+      } else if (
         activeDrag.from === "slot" &&
         activeDrag.originSlotIndex != null
       ) {
-        // return to origin if not dropped anywhere & not deleting
+        // return to origin if not dropped anywhere
         if (stringTimeline[activeDrag.originSlotIndex] === null)
           stringTimeline[activeDrag.originSlotIndex] = activeDrag.noteIndex;
       }
-      // else: in delete zone → do nothing (note removed)
 
-      buildOrUpdateStringsSequence(); // keep sequence aligned with timeline
+      buildOrUpdateStringsSequence();
       primeTransportOnce();
     }
     activeDrag = null;
+
+    // If user switched to 1-finger near a slot (D-B), we already dropped via non-pinching branch.
+    snappedSlotIdx = -1;
   }
 }
 
