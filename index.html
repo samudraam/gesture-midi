@@ -36,6 +36,7 @@
         height: 100%;
         pointer-events: none;
       }
+
       .card {
         position: fixed;
         top: 50%;
@@ -80,7 +81,6 @@
         display: none;
       }
 
-      /* Mockup UI Elements */
       .status-bar {
         position: fixed;
         top: 0;
@@ -95,36 +95,26 @@
         z-index: 100;
         border-bottom: 1px solid #333;
       }
-
       .status-left {
         display: flex;
         align-items: center;
         gap: 10px;
       }
-
       .status-right {
         display: flex;
         align-items: center;
         gap: 20px;
       }
-
       .gesture-active {
         color: #00ff88;
         font-weight: 600;
       }
-
-      .bpm-display {
-        display: flex;
-        align-items: center;
-        gap: 8px;
-      }
-
+      .bpm-display,
       .play-status {
         display: flex;
         align-items: center;
         gap: 8px;
       }
-
       .gesture-icon {
         width: 40px;
         height: 40px;
@@ -135,7 +125,6 @@
         font-size: 18px;
       }
 
-      /* Side Panels */
       .drums-panel {
         position: fixed;
         top: 60px;
@@ -148,20 +137,17 @@
         flex-direction: column;
         z-index: 50;
       }
-
       .bpm-title {
         font-size: 18px;
         font-weight: 600;
         margin-bottom: 8px;
       }
-
       .bpm-instruction {
         font-size: 12px;
         color: #888;
         margin-bottom: 20px;
         text-align: center;
       }
-
       .bpm-slider-container {
         height: 500px;
         width: 80px;
@@ -170,7 +156,6 @@
         position: relative;
         cursor: pointer;
       }
-
       .bpm-slider-fill {
         position: absolute;
         bottom: 0;
@@ -180,7 +165,6 @@
         border-radius: 10px;
         transition: height 0.1s ease;
       }
-
       .bpm-panel {
         position: fixed;
         top: 60px;
@@ -196,18 +180,12 @@
         z-index: 50;
       }
 
-      .drums-title {
-        font-size: 18px;
-        font-weight: 600;
-        margin-bottom: 8px;
+      .panel-section-title {
+        margin-top: 8px;
+        font-size: 13px;
+        color: #9aa3ad;
+        letter-spacing: 0.02em;
       }
-
-      .drums-instruction {
-        font-size: 12px;
-        color: #888;
-        margin-bottom: 20px;
-      }
-
       .instrument-button {
         width: 100%;
         padding: 12px;
@@ -219,18 +197,15 @@
         cursor: pointer;
         transition: all 0.2s ease;
       }
-
       .instrument-button:hover {
         background: rgba(70, 70, 70, 0.8);
         border-color: #00ff88;
       }
-
       .instrument-button.active {
         background: #00ff88;
         color: #000;
         border-color: #00ff88;
       }
-
       .save-pattern {
         width: 100%;
         padding: 12px;
@@ -242,13 +217,11 @@
         cursor: pointer;
         transition: all 0.2s ease;
       }
-
       .save-pattern:hover {
         background: #ff4444;
         color: #fff;
       }
 
-      /* Bottom Gesture Bar */
       .gesture-bar {
         position: fixed;
         bottom: 0;
@@ -263,28 +236,23 @@
         padding: 0 20px;
         z-index: 50;
       }
-
       .gesture-controls {
         display: flex;
         gap: 30px;
       }
-
       .gesture-item {
         display: flex;
         align-items: center;
         gap: 8px;
       }
-
       .gesture-text {
         font-size: 12px;
       }
-
       .gesture-actions {
         display: flex;
         gap: 20px;
         align-items: center;
       }
-
       .action-button {
         background: transparent;
         border: none;
@@ -294,14 +262,92 @@
         border-radius: 4px;
         transition: background 0.2s ease;
       }
-
       .action-button:hover {
         background: rgba(255, 255, 255, 0.1);
       }
+
+      .hidden {
+        display: none !important;
+      }
+
+      /* Strings overlay buttons (kept): add/subtract + play */
+      .strings-ui {
+        position: fixed;
+        inset: 0;
+        pointer-events: none;
+        z-index: 60;
+      }
+      .strings-ui .cluster {
+        position: absolute;
+        display: flex;
+        gap: 8px;
+        pointer-events: auto;
+      }
+      .strings-ui .tiny {
+        font-size: 12px;
+        opacity: 0.8;
+        margin-bottom: 4px;
+      }
+      .strings-ui .vstack {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+      }
+      .strings-ui .btn {
+        padding: 8px 10px;
+        background: rgba(50, 50, 50, 0.85);
+        border: 1px solid #555;
+        border-radius: 8px;
+        color: #fff;
+        cursor: pointer;
+      }
+      .strings-ui .btn:hover {
+        border-color: #00ff88;
+        background: rgba(70, 70, 70, 0.85);
+      }
+      .strings-ui .btn.active {
+        background: #00ff88;
+        color: #000;
+        border-color: #00ff88;
+      }
+
+      .transport-bar {
+        position: fixed;
+        right: 20px;
+        bottom: 96px; /* 80px gesture bar height + 16px gap */
+        display: flex;
+        gap: 12px; /* T2 spacing */
+        z-index: 80;
+      }
+
+      .transport-button {
+        padding: 8px 16px;
+        border-radius: 999px; /* C1 pill */
+        background: rgba(255, 255, 255, 0.08);
+        color: #ffffff;
+        font-size: 14px;
+        font-weight: 500;
+        border: 1px solid rgba(255, 255, 255, 0.12);
+        cursor: pointer;
+        transition: all 0.2s ease;
+      }
+
+      .transport-button:hover {
+        background: rgba(255, 255, 255, 0.15);
+      }
+
+      .transport-button.active {
+        background: rgba(0, 255, 136, 0.2);
+        border-color: rgba(0, 255, 136, 0.6);
+        box-shadow: 0 0 14px rgba(0, 255, 136, 0.45);
+        font-weight: 600;
+      }
     </style>
+
     <!-- Tone.js -->
     <script src="https://unpkg.com/tone@14.8.49/build/Tone.js"></script>
-    <!-- MediaPipe Tasks Vision (GestureRecognizer + HandLandmarker assets) -->
+
+    <!-- MediaPipe Tasks Vision -->
     <script type="module">
       import {
         GestureRecognizer,
@@ -342,24 +388,59 @@
       </div>
     </div>
 
-    <!-- Left Panel - Drums -->
+    <!-- Left Panel -->
     <div class="drums-panel">
-      <div class="drums-title">Drums</div>
-      <div class="drums-instruction">Click to choose</div>
-      <button class="instrument-button active" data-instrument="kick">
-        Kick
-      </button>
-      <button class="instrument-button" data-instrument="closedhihat">
-        Closed Hihat
-      </button>
-      <button class="instrument-button" data-instrument="openhihat">
-        Open Hihat
-      </button>
-      <button class="instrument-button" data-instrument="snare">Snare</button>
-      <button class="save-pattern">Save Pattern</button>
+      <div class="panel-section-title">Mode</div>
+      <div
+        class="mode-buttons"
+        style="
+          display: grid;
+          grid-template-columns: 1fr 1fr;
+          gap: 8px;
+          margin-bottom: 14px;
+        "
+      >
+        <button class="instrument-button active" id="modeDrums">Drums</button>
+        <button class="instrument-button" id="modeStrings">Strings</button>
+      </div>
+
+      <!-- DRUMS CONTROL LIST -->
+      <div id="drumControlList">
+        <div class="drums-title">Drums</div>
+        <div class="drums-instruction">Click to choose</div>
+        <button class="instrument-button active" data-instrument="kick">
+          Kick
+        </button>
+        <button class="instrument-button" data-instrument="closedhihat">
+          Closed Hihat
+        </button>
+        <button class="instrument-button" data-instrument="openhihat">
+          Open Hihat
+        </button>
+        <button class="instrument-button" data-instrument="snare">Snare</button>
+        <button class="save-pattern">Save Pattern</button>
+      </div>
+
+      <!-- STRINGS CONTROL LIST (replaces drums list in Strings mode) -->
+      <div id="stringsControlList" class="hidden">
+        <div class="drums-title">Play</div>
+        <div class="drums-instruction">Control playback</div>
+        <button id="transportPlayStrings" class="instrument-button">
+          ► Strings
+        </button>
+        <button id="transportPlayAll" class="instrument-button">► all</button>
+
+        <div class="drums-instruction" style="margin-top: 20px">
+          Add or subtract notes.
+        </div>
+        <div class="key-buttons">
+          <button id="addSlot" class="instrument-button">add</button>
+          <button id="subSlot" class="instrument-button">subtract</button>
+        </div>
+      </div>
     </div>
 
-    <!-- Right Panel - BPM Control -->
+    <!-- Right Panel - BPM -->
     <div class="bpm-panel">
       <div class="bpm-title">BPM</div>
       <div class="bpm-instruction">Pinch and drag to set</div>
@@ -368,6 +449,9 @@
       </div>
     </div>
 
+    <!-- Transport Bar (NEW) -->
+    <div id="transportBar" class="transport-bar"></div>
+
     <!-- Bottom Gesture Bar -->
     <div class="gesture-bar">
       <div class="gesture-controls">
@@ -375,30 +459,32 @@
           <div class="gesture-icon">👌</div>
           <div class="gesture-text">
             <div>Pinch</div>
-            <div>Toggle beat</div>
-          </div>
-        </div>
-        <div class="gesture-item">
-          <div class="gesture-icon">👋</div>
-          <div class="gesture-text">
-            <div>Open hand</div>
-            <div>Play sequence</div>
+            <div>Toggle beat / drag note</div>
           </div>
         </div>
         <div class="gesture-item">
           <div class="gesture-icon">👆</div>
           <div class="gesture-text">
-            <div>Pointer finger</div>
-            <div>Pause sequence</div>
+            <div>Pointer</div>
+            <div>Stop</div>
+          </div>
+        </div>
+        <div class="gesture-item">
+          <div class="gesture-icon">👌 ⬇️</div>
+          <div class="gesture-text">
+            <div>Pinch and drag point in string mode to delete a point.</div>
           </div>
         </div>
       </div>
       <div class="gesture-actions">
-        <button class="action-button">×</button>
+        <button class="action-button">Best practice to keep hand open to keep music playing.</button>
+
         <button class="action-button" id="clearAll">🗑️ Clear All</button>
-        <button class="action-button">?</button>
       </div>
     </div>
+
+    <!-- Strings UI Section -->
+    <div id="stringsUI" class="hidden"></div>
 
     <script src="sketch.js" type="module"></script>
   </body>

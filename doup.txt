@@ -486,8 +486,9 @@ function layoutStringsGeometry() {
     const col = i % SLOTS_PER_ROW;
     const rowSlotsCount = Math.min(SLOTS_PER_ROW, total - row * SLOTS_PER_ROW);
     const sectionW = timelineUsableW / rowSlotsCount;
+    const indent = row % 2 === 1 ? sectionW * 0.5 : 0;
 
-    const cx = baseX + sectionW * (col + 0.5);
+    const cx = baseX + indent + sectionW * (col + 0.5);
     const cy = rowStartY + row * SLOT_ROW_GAP;
 
     timelineSlots.push({ idx: i, centerX: cx, centerY: cy, sectionW });
@@ -591,16 +592,6 @@ function drawFallingParticles() {
     const perp = o.angle + (Math.PI / 2) * o.curve;
     const fx = o.x + (cx - o.x) * prog + curve * Math.cos(perp);
     const fy = o.y + (cy - o.y) * prog + curve * Math.sin(perp);
-
-    // Add current position to path
-    if (o.path) {
-      o.path.push({ x: fx, y: fy });
-      // Keep only last 20 points for streak
-      if (o.path.length > 20) {
-        o.path.shift();
-      }
-    }
-
     const fade = 80 * (1 - prog),
       size = 8 * (1 - prog) + 2;
 
@@ -619,20 +610,6 @@ function drawFallingParticles() {
         col = "rgba(240,0,255,";
         break;
     }
-
-    // Draw streak trail
-    if (o.path && o.path.length > 1) {
-      ctx.strokeStyle = col + (fade * 0.5) / 100 + ")";
-      ctx.lineWidth = 4;
-      ctx.lineCap = "round";
-      ctx.beginPath();
-      ctx.moveTo(o.path[0].x, o.path[0].y);
-      for (let p = 1; p < o.path.length; p++) {
-        ctx.lineTo(o.path[p].x, o.path[p].y);
-      }
-      ctx.stroke();
-    }
-
     for (let b = 5; b > 0; b--) {
       ctx.fillStyle = col + fade * (5 - b) * 0.01 + ")";
       ctx.beginPath();
@@ -659,15 +636,7 @@ function spawnParticleForStep(i) {
   if (snareSteps[i]) inst = "snare";
   else if (closedHihatSteps[i]) inst = "closedhihat";
   else if (openHihatSteps[i]) inst = "openhihat";
-  falling.push({
-    x,
-    y,
-    t: 0,
-    angle: ang,
-    curve: curveDir,
-    instrument: inst,
-    path: [{ x, y }], // Track path for streak
-  });
+  falling.push({ x, y, t: 0, angle: ang, curve: curveDir, instrument: inst });
 }
 
 // STRINGS UI (with pulse animation)
@@ -998,23 +967,8 @@ function handleStringsGestures(lm) {
         }
       }
     } else {
-      // Update ghost position - snap to hovered slot if over one
-      if (hoverSlotIdx >= 0) {
-        // Snap to the hovered slot center
-        const targetSlot = timelineSlots.find((s) => s.idx === hoverSlotIdx);
-        if (targetSlot) {
-          activeDrag.ghostX = targetSlot.centerX;
-          activeDrag.ghostY = targetSlot.centerY;
-        } else {
-          // Fallback to pointer position
-          activeDrag.ghostX = px;
-          activeDrag.ghostY = py;
-        }
-      } else {
-        // Not over any slot - use pointer position
-        activeDrag.ghostX = px;
-        activeDrag.ghostY = py;
-      }
+      activeDrag.ghostX = px;
+      activeDrag.ghostY = py;
     }
   } else {
     // release: try drop, else delete if below zone, else return if lifted from slot
